@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "es2018",
+    "noImplicitAny": false,
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "lib": ["es2021"],
+    "baseUrl": ".",
+    "outDir": "dist",
+    "paths": {
+      "*": [ "node_modules/*" ]
+    }
+  },
+  "include": [ "src/**/*" ],
+  "exclude": [ "dist/" ]
+}
