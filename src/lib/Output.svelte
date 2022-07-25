@@ -17,7 +17,7 @@
   const prompt = `you@adampisula:${$path} $ `;
 </script>
 
-<div>
+<div class="mb-2">
   <span>{ prompt }{ command }</span>
   {#if name == 'hello'}
     <Hello command={full} />
@@ -27,6 +27,8 @@
     <Pwd command={full} />
   {:else if name == 'cd'}
     <Cd command={full} />
+  {:else if !name}
+    <div></div>
   {:else}
     <NotFound />
   {/if}
