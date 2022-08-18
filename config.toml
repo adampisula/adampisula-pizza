@@ -1,0 +1,26 @@
+baseURL = '/'
+languageCode = 'en-us'
+title= "Adam Pisula | Software Developer"
+theme = 'hello-friend'
+paginate = 5
+
+[params]
+	defaultTheme = "dark"
+	showReadingTime = true
+	toc = true
+
+[params.logo]
+	logoHomeLink = "/"
+	logoText = "Adam Pisula"
+
+# [menu]
+# 	[[menu.main]]
+# 		identifier = "about"
+# 		name = "About"
+# 		url = "/about"
+
+# 	[[menu.main]]
+# 		identifier = "projects"
+# 		name = "Projects"
+# 		url = "/projects"
+
