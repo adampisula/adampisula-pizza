@@ -1,0 +1,16 @@
+on:
+  workflow_run:
+    workflows: [Create and publish a Docker image]
+    types: [completed]
+    branches: [develop]
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Notify webhook
+      uses: fjogeleit/http-request-action@v1
+      with:
+        url: ${{ secrets.PORTAINER_WEBHOOK }}
+        method: 'POST'
+        timeout: 45000
+        preventFailureOnNoResponse: true
