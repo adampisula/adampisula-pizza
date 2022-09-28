@@ -2,7 +2,7 @@ on:
   workflow_run:
     workflows: [Create and publish a Docker image]
     types: [completed]
-    branches: [develop]
+    branches: [main]
 jobs:
   deployment:
     runs-on: ubuntu-latest
