@@ -97,7 +97,7 @@ I created a Node.js HTTP server with Express and connected to the MC server usin
 
 I left it running for some time and when I came back I realized that I've made a grave mistake, because the moment I logged out of the server, the villager stopped moving and rightfully so. Minecraft Servers optimize so that mobs don't move when they are not being rendered and they are only rendered when there's a user nearby.
 
-So I started looking around again and found a really cool project called *PrismarineJS* and their repo [mineflayer](https://github.com/PrismarineJS/mineflayer). Mineflayer is a JS library which allows you to spawn bots, and for my purposes I only needed the bots to stand near a villager, so the villager's "AI" activates. I knew that the villager can't be allowed to see the bot, since it would cause the villager to walk near it and that destroys the whole purpose of the project.
+So I started looking around again and found a really cool project called *PrismarineJS* and their repo [mineflayer](https://github.com/PrismarineJS/mineflayer). Mineflayer is a JS library which allows you to spawn bots, and for my purposes I only needed the bots to stand near a villager, so the villager's "AI" activates. I knew that the villager can't be allowed to see the bot, since it would cause the villager to walk near it and that defeats the whole purpose of the project.
 
 The villager platform looked like this:
 
