@@ -1,4 +1,4 @@
-baseURL = '/'
+baseURL = "https://adampisula.pizza"
 languageCode = 'en-us'
 title= "Adam Pisula | Software Developer"
 theme = 'hello-friend'
