@@ -1,7 +1,10 @@
 ---
-title: "Minecraft Villagers seeding an RNG"
+title: "Getting pseudo-random with Minecraft Villagers"
 date: 2022-09-02T11:21:50+02:00
 draft: false
+cover: "/mc-villagers-rng/cover.png"
+images:
+  - "/mc-villagers-rng/cover.png"
 ---
 
 ## TL;DR
