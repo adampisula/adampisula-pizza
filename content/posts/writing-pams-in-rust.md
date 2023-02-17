@@ -1,8 +1,9 @@
 ---
 title: "Writing custom PAMs in Rust"
-date: 2022-11-09T10:20:00+02:00
-draft: true
+date: 2023-02-17T11:23:00+02:00
+draft: false 
 cover: "/writing-pams-in-rust/cover.png"
+coverCaption: "Photo by Michael Dziedzic on Unsplash"
 images:
   - "/writing-pams-in-rust/cover.png"
 ---
@@ -13,7 +14,7 @@ Authentication in Linux is achieved through the use of PAMs (**P**luggable **A**
 
 Thanks to the way PAMs work, you are not limited to the default login-password authentication - nothing's stopping you from implementing a web-based (perhaps an external API?), facial recognition, or physical key auth.
 
-To find the directory on your PC containing all available PAMs, simply run the following in your terminal:
+To find the directory on your machine containing all available PAMs, simply run the following in your terminal:
 
 ```bash
 find / -path "*/security/pam_exec.so" 2> /dev/null
@@ -43,24 +44,21 @@ pam_wheel.so
 pam_xauth.so
 ```
 
-As you can see, PAMs are `.so` files meaning they are *shared objects*. It's fairly easy to compile C/C++ code into a `.so` file (take a look at [this repository](https://github.com/beatgammit/simple-pam)) and luckily for us, the Rust compiler also provides a way to compile your code into a *shared object* which we'll do next.
+As you can see, PAMs are `.so` files meaning they are *shared objects*. It's fairly easy to compile C/C++ code into a `.so` file (take a look at [this repository](https://github.com/beatgammit/simple-pam)) and luckily for us, the Rust compiler also provides a way to compile your code into a *shared object*, so that our PAMs can be blazingly fast and memory-safe.
+
+If you'd like to learn in detail how PAMs work, I strongly encourage you to read [DigitalOcean's post](https://www.digitalocean.com/community/tutorials/how-to-use-pam-to-configure-authentication-on-an-ubuntu-12-04-vps) - it's a great resource as to what each part of the configuration does.
 
 ## The Plan
 
-My use-case is authenticating a user based on a signed text file on an external USB, but depending on what you want to do, you can just replace my code with what suits you best.
+My use-case is authenticating a user based on a signed text file on an external USB. There are crates available for signing and verifying GPG-signed files and from what I could tell they are pretty well documented, so I feel like there is no reason to go that far in this post. However, if you'd like me to cover it in a separate post, please do give me a shout.
 
 Our step-by-step plan looks as follows:
   
   1. Writing a test in C++ so we don't have to log out every time we make a change.
   2. Most basic PAM in Rust.
   3. Configuring Linux to use our PAM.
-
-The steps below are optional and specific to my use-case, but you can follow along if you feel like it:
-
   4. Mounting a flash drive.
   5. Reading and verifying the contents of a file on the USB.
-  6. Digitally signing our file.
-  7. Verifying the file's signature.
 
 With the plan laid out, let's start coding.
 
@@ -68,13 +66,13 @@ With the plan laid out, let's start coding.
 
 I certainly do *not* recommend doing any of it on your PC, because it's very easy and pretty likely to break something and you might not be able to log into your account afterwards. I spun up a virtual machine with Debian installed (bullseye, no desktop environment) and will do all of my development there.
 
-You might need to install a couple libraries to make this script work. For my Debian install, I ran:
+You might need to install a PAM headers library to make this script work and if you already do have a C++ compiler on your machine, then feel free to omit `g++`. For my Debian install, I ran:
 
 ```bash
-apt install libpam0g-dev
+apt install libpam0g-dev g++
 ```
 
-The script below comes from the [repository](https://github.com/beatgammit/simple-pam) I linked earlier.
+The script below will come in handy to test our Rust code later on. I snatched it from the [repository](https://github.com/beatgammit/simple-pam) I linked earlier.
 
 ```cpp {title="test.cpp"}
 // test.cpp
@@ -147,7 +145,7 @@ Hopefully it compiled successfully and you've been prompted for your password.
 
 Now that we can test the PAMs we write, let's get down to the actual Rust code.
 
-First, make sure you have Rust installed and updated:
+First, make sure you have Rust installed and up to date:
 
 ```bash
 rustup update
@@ -167,7 +165,7 @@ Note we want this project to be a library since we're going to compile it into `
 
 `cd` into the project and edit the `Cargo.toml` file to be as follows:
 
-```toml
+```toml {title="Cargo.toml"}
 # Cargo.toml
 
 [package]
@@ -192,7 +190,7 @@ echo > src/lib.rs
 
 Now open it and write the following code:
 
-```rust
+```rust {title="src/lib.rs"}
 // src/lib.rs
 
 extern crate pam;
@@ -270,29 +268,34 @@ If the project compiled correctly, there should be a `libcustom_pam.so` file ins
 Now copy the resulting `.so` file to the directory containing all PAM modules which in my case is `/usr/lib/x86_64-linux-gnu`. It seems the convention is to name the files there as `pam_foo.so`, so from now on we'll call our module `pam_custom.so`:
 
 ```bash
-cp ./target/debug/libcustom_pam.so /usr/lib/x86_64-linux-gnu/pam_custom.so
+cp ./target/debug/libcustom_pam.so /usr/lib/x86_64-linux-gnu/security/pam_custom.so
 ```
 
 ## Configuring Linux to use the custom PAM
 
-We need to let Linux know, that we want it to use our PAM. For now we'll make it so it falls back on the default password-based auth.
+We need to let Linux know, that we want it to use our PAM. And we'll disable the default password-based authentication.
 
-Open `/etc/pam.d/common-auth` in your text editor and add the following lines at the very beginning of the file:
+Open `/etc/pam.d/common-auth` in your text editor and add the following line at the beginning of the file:
 
 ```
 auth sufficient pam_custom.so
+```
+
+And comment out all the other uncommented lines. Now do the same for `/etc/pam.d/common-account` except add this line to the file:
+
+```
 account sufficient pam_custom.so
 ```
 
-We'll dive deeper into what it does later, but for now let's just leave it at that.
+`sufficient` here essentially means, that if `pam_custom.so` succeeds to authenticate a user, the entire auth process will succeed as well. However, if `pam_custom.so` returns an error, Linux will fall back to the next PAM (like password-based auth). But since we commented out all the other modules, if our custom PAM fails, the whole auth process will. Once again, I strongly recommend reading [DO's post on PAM](https://www.digitalocean.com/community/tutorials/how-to-use-pam-to-configure-authentication-on-an-ubuntu-12-04-vps#how-to-read-policy-lines), especially the part about policy lines. 
 
-You're now ready to test our custom PAM module. Run the test program we compiled earlier:
+We're now ready to test our custom PAM module. Run the test program we compiled earlier:
 
 ```bash
 ../test $USER
 ```
 
-If you've typed in `please`, then our PAM will simply log you in, no questions asked. How cool is that? If not, however, it will fall back to password authentication.
+If you've typed in `please`, PAM will return *SUCCESS*. How cool is that? Try a different prompt, and you should be denied access.
 
 ## Mounting a flash drive using Rust
 
@@ -300,7 +303,8 @@ So now we know our PAM works, time to turn it into something useful. Say I wante
 
 To mount the flash drive we're going to use the `sys-mount` crate:
 
-```toml
+```toml {title="Cargo.toml"}
+# Cargo.toml
 ...
 
 [dependencies]
@@ -310,7 +314,7 @@ sys-mount = "2.0.1"
 
 Let's remove the contents of the `sm_authenticate` method and write some new code to handle USBs and files:
 
-```rust
+```rust {title="src/lib.rs"}
 // src/lib.rs
 
 extern crate pam;
@@ -361,8 +365,8 @@ impl PamHooks for CustomPam {
 		}
 
 		// Mount the USB
-		let mount_result = Mount::new( // You would most likely want to use Mount::builder() if you knew what the file system was beforehand
-			DEVICE,
+		let mount_result = Mount::new( 	// You should use Mount::builder() if you know
+			DEVICE,												// what the file system of the USB drive is
 			MOUNT_PATH
 		); 
 
@@ -403,7 +407,7 @@ impl PamHooks for CustomPam {
 }
 ```
 
-That's a mouthful. Compile it and run it as so:
+I'm aware this code is quite lengthy, but try not to get discouraged - hopefully the comments provide some info on what is going on. Compile it and run it as so:
 
 ```bash
 cargo build
@@ -414,7 +418,7 @@ Try plugging a USB with a file named `pizza.txt` on it, then remove it and run t
 
 ## Reading the file
 
-Now let's say we only want to allow users where the `pizza.txt` file says `I love pizza`, cause why would you let people who don't love pizza onto your PC?
+Now let's say we only want to allow users where the `pizza.txt` file says `I love pizza`, cause why would you let in people who don't love pizza?
 
 ```rust
 // src/lib.rs
@@ -457,73 +461,6 @@ fn sm_authenticate(...) {
 }
 ```
 
-## Digital PGP signing
+## Conclusion
 
-At this stage every single person who has a file named `pizza.txt` containing the text `I love pizza` on their USB will be authenticated. But let's say you are the authority on deciding who loves pizza and who doesn't, and you want to certify certain people. A good way to do so would be to digitally sign the `pizza.txt` file with a private key you keep secret, and then have a public key verifying if the signature matches the contents of the file. While we're at it we can also implement some sort of identification system - let me explain.
-
-We're going to replace the `pizza.txt` file with an `identity.json`, which will contain the following data:
-
-```json
-{
-	"name": "Mike Wazowski",
-	"expiration_timestamp": 1670670217
-}
-```
-
-During authentication we're going to check whether `expiration_timestamp` (seconds since UNIX epoch) is in the past and will not allow entry if so. Nothing's stopping you from implementing other auth criteria like whether the USB's serial ID matches the one mentioned in the JSON file - that should prevent copying the identity and signature files to other flash drives.
-
-First of all we'll need to create a PGP key-pair:
-
-```bash
-gpg --gen-key
-```
-
-Type in your name and e-mail, but leave the passphrase empty. Truth be told, I haven't experimented much with password-protected keys and it might add some overhead in our program. That's why I'll leave it blank, but you can definitely try it for yourself.
-
-Afterwards you can list all the available keys and, lo and behold, your key should be right there.
-
-```
-$ gpg --list-keys
-...
-pub   rsa3072 2022-11-10 [SC] [expires: 2024-11-09]
-      DADFBBF4B99C7707D4844B7083AFD6131FAAF98E
-uid           [ultimate] Adam Pisula <me@adampisula.pizza>
-sub   rsa3072 2022-11-10 [E] [expires: 2024-11-09]
-```
-
-Now let's export the public key to a file (`--armor` makes the output human-readable):
-
-```bash
-gpg --armor --output my_pub_key.gpg --export me@adampisula.pizza
-```
-
-The `my_pub_key.gpg` file should look something like this:
-
-```
------BEGIN PGP PUBLIC KEY BLOCK-----
-
-mQGNBGNs6+EBDADt5a9qfCqlNc8T9YiKeBR/XpDcP4NyLEgyf+AnOIbLKAPtVcvC
-...
-=8kjE
------END PGP PUBLIC KEY BLOCK-----
-```
-
-Now copy this file to your VM and run:
-
-```bash
-gpg --import my_pub_key.gpg
-```
-
-So now when you run `gpg --list-keys` on your VM, one of the entries on the list should be your newly created pubkey.
-
-With the secret and public key in place, we can proceed to sign your `identity.json` file with the secret key (on your machine, not the VM):
-
-```bash
-gpg --armor --output identity.sig --detach-sig identity.json
-```
-
-This will create an `identity.sig` file (in a human-friendly format thanks to `--armor`) which we'll use to verify if contents of `identity.json` have not been altered. Copy both `identity.json` and `identity.sig` files onto your flash drive and let's continue coding.
-
-## Verifying file's signature in Rust
-
-To verify the PGP signature, we're going to use `sequoia-openpgp` as I found it the easiest to use for what we're trying to do here.
+Hopefully you got it all working and you learned something useful. Keep in mind the code in this post is far from production-ready - I found a couple bugs here and there (when logging in to SSH with a password, to name one). Having said that, all this should have given you the basic understanding of how PAMs work and how incredibly powerful this system is. It's very likely I missed something or simply lack the knowledge of, so if you have any ideas on how to improve this post, don't hesitate to e-mail me at `adam.pisula@outlook.com`.

@@ -1,0 +1,5 @@
+<script type="text/javascript">// <![CDATA[
+  // Hide email address, at least we try (base64)
+  var liameHREF ='href="mailto:{{ .email | base64Encode }}"';
+  document.write('<a  class="{{ .class }}" ' + atob(liameHREF) + ' target="_blank">' + atob(liame) + '<\/a>')
+  // ]]></script>
